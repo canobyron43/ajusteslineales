@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ajuste Lineal - Diseño Neon</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body{
+      min-height:100vh;
+      background:#050816;
+      color:white;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      padding:20px;
+    }
+
+    .container{
+      width:100%;
+      max-width:1100px;
+      background:#0b1025;
+      border:2px solid #00f7ff;
+      border-radius:20px;
+      padding:30px;
+      box-shadow:
+        0 0 10px #00f7ff,
+        0 0 25px #00f7ff55,
+        0 0 50px #00f7ff33;
+    }
+
+    h1{
+      text-align:center;
+      margin-bottom:25px;
+      color:#00f7ff;
+      text-shadow:0 0 10px #00f7ff;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:20px;
+    }
+
+    .card{
+      background:#111933;
+      border-radius:15px;
+      padding:20px;
+      border:1px solid #00f7ff44;
+      box-shadow:0 0 15px #00f7ff22;
+    }
+
+    .card h2{
+      margin-bottom:15px;
+      color:#00f7ff;
+    }
+
+    .input-group{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    label{
+      font-size:14px;
+      margin-bottom:4px;
+      display:block;
+    }
+
+    input{
+      width:100%;
+      padding:10px;
+      border:none;
+      outline:none;
+      border-radius:10px;
+      background:#0b1025;
+      color:white;
+      border:1px solid #00f7ff66;
+      transition:0.3s;
+    }
+
+    input:focus{
+      box-shadow:0 0 10px #00f7ff;
+    }
+
+    button{
+      width:100%;
+      padding:14px;
+      margin-top:10px;
+      border:none;
+      border-radius:12px;
+      background:#00f7ff;
+      color:#000;
+      font-weight:bold;
+      cursor:pointer;
+      transition:0.3s;
+      font-size:16px;
+    }
+
+    button:hover{
+      transform:scale(1.03);
+      box-shadow:0 0 15px #00f7ff;
+    }
+
+    .results{
+      margin-top:20px;
+      line-height:2;
+      font-size:18px;
+    }
+
+    .equation{
+      color:#00ff9d;
+      font-weight:bold;
+    }
+
+    .r2{
+      color:#ffd000;
+      font-weight:bold;
+    }
+
+    canvas{
+      margin-top:20px;
+      background:white;
+      border-radius:15px;
+      padding:10px;
+    }
+
+    .error{
+      color:#ff4d6d;
+      margin-top:10px;
+      font-weight:bold;
+    }
+
+    @media(max-width:850px){
+      .grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <h1>📈 Ajuste Lineal Neon</h1>
+
+    <div class="grid">
+
+      <!-- FORMULARIO -->
+      <div class="card">
+
+        <h2>Ingresar Datos</h2>
+
+        <div id="inputs"></div>
+
+        <button onclick="calcular()">Calcular Ajuste Lineal</button>
+
+        <div class="error" id="error"></div>
+
+      </div>
+
+      <!-- RESULTADOS -->
+      <div class="card">
+
+        <h2>Resultados</h2>
+
+        <div class="results">
+          <p><strong>Ecuación:</strong> <span class="equation" id="ecuacion">-</span></p>
+          <p><strong>R²:</strong> <span class="r2" id="r2">-</span></p>
+        </div>
+
+        <canvas id="grafica"></canvas>
+
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+
+    // GENERAR INPUTS
+    const inputsDiv = document.getElementById("inputs");
+
+    for(let i=1; i<=5; i++){
+
+      inputsDiv.innerHTML += `
+        <div class="input-group">
+
+          <div>
+            <label>Tiempo ${i}</label>
+            <input type="number" step="any" id="x${i}" placeholder="Tiempo">
+          </div>
+
+          <div>
+            <label>Distancia ${i}</label>
+            <input type="number" step="any" id="y${i}" placeholder="Distancia">
+          </div>
+
+        </div>
+      `;
+    }
+
+    let chart;
+
+    function calcular(){
+
+      const error = document.getElementById("error");
+      error.textContent = "";
+
+      let x = [];
+      let y = [];
+
+      // VALIDACIÓN
+      for(let i=1; i<=5; i++){
+
+        let xi = parseFloat(document.getElementById(`x${i}`).value);
+        let yi = parseFloat(document.getElementById(`y${i}`).value);
+
+        if(isNaN(xi) || isNaN(yi)){
+          error.textContent = "⚠️ Todos los campos deben contener números válidos.";
+          return;
+        }
+
+        x.push(xi);
+        y.push(yi);
+      }
+
+      const n = x.length;
+
+      let sumX = 0;
+      let sumY = 0;
+      let sumXY = 0;
+      let sumX2 = 0;
+
+      for(let i=0; i<n; i++){
+        sumX += x[i];
+        sumY += y[i];
+        sumXY += x[i] * y[i];
+        sumX2 += x[i] * x[i];
+      }
+
+      // PENDIENTE Y INTERSECCIÓN
+      const m = ((n * sumXY) - (sumX * sumY)) / ((n * sumX2) - (sumX * sumX));
+      const b = (sumY - (m * sumX)) / n;
+
+      // R²
+      let yProm = sumY / n;
+
+      let ssTot = 0;
+      let ssRes = 0;
+
+      for(let i=0; i<n; i++){
+
+        let yPred = (m * x[i]) + b;
+
+        ssTot += Math.pow(y[i] - yProm, 2);
+        ssRes += Math.pow(y[i] - yPred, 2);
+      }
+
+      const r2 = 1 - (ssRes / ssTot);
+
+      // MOSTRAR RESULTADOS (CORREGIDO)
+    let m_limpia = Number(m.toFixed(4));
+    let b_limpia = Number(b.toFixed(4));
+    
+    // Esto define si se muestra "+" o "-" dinámicamente
+    let signo = b_limpia >= 0 ? ' + ' : ' - ';
+    let b_absoluta = Math.abs(b_limpia);
+
+        // Imprime la ecuación limpia en el HTML
+   
+    document.getElementById("ecuacion").innerHTML = `y = ${m_limpia}x${signo}${b_absoluta}`;
+
+    // Imprime el R² sin ceros de relleno innecesarios
+    document.getElementById("r2").innerHTML = Number(r2.toFixed(4));
+    
+
+      // DATOS PARA RECTA
+      const minX = Math.min(...x);
+      const maxX = Math.max(...x);
+
+      const linea = [
+        {x:minX, y:(m*minX)+b},
+        {x:maxX, y:(m*maxX)+b}
+      ];
+
+      // CREAR GRÁFICA
+      const ctx = document.getElementById("grafica").getContext("2d");
+
+      if(chart){
+        chart.destroy();
+      }
+
+      chart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [
+
+            {
+              label: 'Datos',
+              data: x.map((valor, i)=>({
+                x: valor,
+                y: y[i]
+              })),
+              backgroundColor: '#00f7ff',
+              pointRadius: 6
+            },
+
+            {
+              label: 'Ajuste Lineal',
+              data: linea,
+              type: 'line',
+              borderColor: '#ff007f',
+              borderWidth: 3,
+              fill:false,
+              tension:0
+            }
+
+          ]
+        },
+
+        options: {
+
+          responsive:true,
+
+          plugins:{
+            legend:{
+              labels:{
+                color:'black'
+              }
+            }
+          },
+
+          scales:{
+
+            x:{
+              title:{
+                display:true,
+                text:'Tiempo'
+              }
+            },
+
+            y:{
+              title:{
+                display:true,
+                text:'Distancia'
+              }
+            }
+
+          }
+
+        }
+      });
+
+    }
+
+  </script>
+
+</body>
+</html>
